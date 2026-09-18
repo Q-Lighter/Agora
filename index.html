@@ -17,5 +17,16 @@
   <body>
     <h1>Holding Ground</h1>
     <p>Track how your holdings could grow over time</p>
+    <button id="testButton">Click me</button>
+    <P id="output"></P>
+
+    <script>
+      const button = document.getElementById("testButton");
+      const output = document.getElementById("output");
+
+      button.addEventListener("click",function() {
+        output.textContent = "You clicked the button!";
+      });
+    </script>
   </body>
 </html>
