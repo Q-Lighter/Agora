@@ -22,15 +22,19 @@
     <p id="output"></p>
 
    <script>
-   const input = document.getElementById("nameInput");
-   const button = document.getElementById("testButton");
-   const output = document.getElementById("output");
+     const input = document.getElementById("nameInput");
+     const button = document.getElementById("testButton");
+     const output = document.getElementById("output");
 
-   button.addEventListener("click", function() {
-     const stockName = input.value;
-     output.textContent = "You added: " + stockName;
-   });
+     const stocks = [];
+
+     button.addEventListener("click", function() {
+       const stockName = input.value;
+       stocks.push(stockName);
+       output.textContent = "Your stocks: " + stocks.join(", ");
+       input.value = "";
+     });
 </script>
-    </script>
+
   </body>
 </html>
