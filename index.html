@@ -1,47 +1,687 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Holding Ground</title>
-    <style>
-      body {
-        font-family: sans-serif;
-        background-colour: #F6F4EE;
-        color: #1B211C;
-        padding: 20px;
-      }
-      h1 {
-        color: #2F6F4E;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Holding Ground</h1>
-    <p>Track how your holdings could grow over time</p>
-    <input type="text" id="nameInput" placeholder="Enter a stock name">
-    <button id="testButton">Add it</button>
-    <div id="stockList"></div>
-
-  <script>
-  const input = document.getElementById("nameInput");
-  const button = document.getElementById("testButton");
-  const stockList = document.getElementById("stockList");
-
-  const stocks = [];
-
-  function renderStocks() {
-    stockList.innerHTML = stocks.map(function(stock) {
-      return "<p style='color:" + stock.color + "'>" + stock.name + "</p>";
-    }).join("");
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Holding Ground — Stock Gains Visualizer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #F6F4EE;
+    --surface: #FFFFFF;
+    --surface-2: #FBFAF5;
+    --ink: #1B211C;
+    --ink-soft: #5B655F;
+    --green: #2F6F4E;
+    --green-deep: #1F4A34;
+    --gold: #B98A2E;
+    --brick: #A33B2E;
+    --border: #E1DDCF;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(27,33,28,0.06), 0 6px 18px rgba(27,33,28,0.05);
+    --serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+    --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121A15; --surface: #1A241E; --surface-2: #1F2B23;
+      --ink: #ECE9DF; --ink-soft: #A7B0A8; --border: #2B3A31;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121A15; --surface: #1A241E; --surface-2: #1F2B23;
+    --ink: #ECE9DF; --ink-soft: #A7B0A8; --border: #2B3A31;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 22px rgba(0,0,0,.4);
   }
 
-  button.addEventListener("click", function() {
-    const stockName = input.value;
-    const newStock = { name: stockName, color: "#2F6F4E", price: 100 };
-    stocks.push(newStock);
-    renderStocks();
-    input.value = "";
-  });
-</script>
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
 
-  </body>
+  header.top {
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 18px clamp(16px,4vw,32px);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top:0; background: var(--bg); z-index: 20;
+  }
+  .brand { display:flex; flex-direction:column; gap:2px; }
+  .brand h1 {
+    font-family: var(--serif); font-weight:600; font-size: clamp(20px,3vw,26px);
+    margin:0; letter-spacing: -0.01em;
+  }
+  .brand span { color: var(--ink-soft); font-size: 13px; }
+
+  .top-actions { display:flex; gap:10px; align-items:center; }
+
+  button { font-family: var(--sans); cursor:pointer; }
+
+  .btn {
+    border-radius: 10px; border: 1px solid var(--border);
+    padding: 10px 16px; font-size: 14px; font-weight:600;
+    background: var(--surface); color: var(--ink);
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+  }
+  .btn:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+  .btn-primary { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn-primary:hover { background: var(--green-deep); }
+  .btn-ghost { background: transparent; }
+  .btn-danger { background: var(--brick); border-color: var(--brick); color:#fff; }
+
+  .icon-btn {
+    width: 30px; height:30px; border-radius:8px; border:1px solid transparent;
+    background: transparent; display:flex; align-items:center; justify-content:center;
+    color: var(--ink-soft); transition: background .12s ease, color .12s ease;
+  }
+  .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+  .icon-btn.danger:hover { color: var(--brick); }
+  .icon-btn svg { width:16px; height:16px; }
+
+  .app {
+    display: grid;
+    grid-template-columns: 1fr;
+    max-width: 1400px; margin: 0 auto;
+    padding: clamp(16px,3vw,28px);
+    gap: 20px;
+  }
+  @media (min-width: 900px) {
+    .app { grid-template-columns: 1fr 320px; align-items:start; }
+  }
+
+  main.content { display:flex; flex-direction:column; gap:20px; min-width:0; }
+
+  .card {
+    background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+    padding: clamp(14px,2.5vw,22px);
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    font-family: var(--serif); font-size:18px; font-weight:600; margin: 0 0 4px 0;
+  }
+  .card .sub { color: var(--ink-soft); font-size: 13px; margin: 0 0 16px 0; }
+
+  .chart-wrap { position: relative; height: 340px; }
+  .chart-wrap.small { height: 280px; }
+
+  .charts-row { display:grid; grid-template-columns: 1fr; gap:20px; }
+  @media (min-width: 640px) { .charts-row { grid-template-columns: 1.4fr 1fr; } }
+
+  .empty-state {
+    text-align:center; padding: 48px 20px; color: var(--ink-soft);
+  }
+  .empty-state h3 { font-family: var(--serif); color: var(--ink); font-size:18px; margin:0 0 6px 0; }
+  .empty-state p { margin:0 0 18px 0; font-size:14px; }
+
+  /* sidebar */
+  aside.sidebar {
+    background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px; display:flex; flex-direction:column; gap:12px;
+    max-height: calc(100vh - 100px);
+  }
+  aside.sidebar h2 { font-family: var(--serif); font-size:16px; margin:0; }
+
+  .search-wrap { position:relative; }
+  .search-wrap input {
+    width:100%; padding: 9px 12px 9px 34px; border-radius:10px; border:1px solid var(--border);
+    background: var(--surface-2); color: var(--ink); font-size:14px; font-family: var(--sans);
+  }
+  .search-wrap input:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+  .search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); width:15px; height:15px; color: var(--ink-soft); }
+
+  .stock-list { display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding-right:2px; }
+  .stock-card {
+    display:flex; align-items:center; gap:6px; padding: 10px 10px 10px 14px;
+    border-radius: 14px; border:1px solid var(--border); background: var(--surface-2);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .stock-card:hover { transform: scale(1.03); box-shadow: var(--shadow); z-index:1; }
+  .stock-name {
+    flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-family: var(--serif); font-weight:600; font-size:15px;
+  }
+  .stock-meta { font-size:11px; color: var(--ink-soft); display:block; font-family: var(--sans); font-weight:400; }
+
+  .sidebar-empty { color: var(--ink-soft); font-size: 13px; padding: 20px 4px; text-align:center; }
+
+  /* mobile drawer behavior */
+  .sidebar-toggle { display:none; }
+  @media (max-width: 899px) {
+    .sidebar-toggle { display:flex; }
+    aside.sidebar {
+      position: fixed; top:0; right:0; height:100vh; width: min(84vw, 340px);
+      max-height:none; border-radius:0; z-index: 40;
+      transform: translateX(100%); transition: transform .22s ease;
+      padding-top: 70px;
+    }
+    aside.sidebar.open { transform: translateX(0); }
+    .scrim {
+      display:none; position:fixed; inset:0; background: rgba(10,14,11,0.4); z-index:30;
+    }
+    .scrim.open { display:block; }
+  }
+
+  /* modal */
+  .modal-scrim {
+    display:none; position:fixed; inset:0; background: rgba(10,14,11,0.45);
+    z-index: 60; align-items:center; justify-content:center; padding:16px;
+  }
+  .modal-scrim.open { display:flex; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius); border:1px solid var(--border);
+    max-width: 520px; width:100%; max-height: 88vh; overflow-y:auto; padding: 22px;
+    box-shadow: var(--shadow);
+  }
+  .modal h3 { font-family: var(--serif); font-size:20px; margin:0 0 16px 0; }
+  .modal.confirm { max-width: 380px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; color: var(--ink-soft); }
+  .field input, .field select {
+    width:100%; padding: 9px 11px; border-radius:10px; border:1px solid var(--border);
+    background: var(--surface-2); color: var(--ink); font-size:14px; font-family: var(--sans);
+  }
+  .field input:focus, .field select:focus { outline: 2px solid var(--green); outline-offset:1px; }
+  .row-2 { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  .color-row { display:flex; align-items:center; gap:10px; }
+  .color-row input[type=color] { width:44px; height:36px; border-radius:8px; border:1px solid var(--border); padding:2px; background:var(--surface-2); }
+
+  .year-row {
+    border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; background: var(--surface-2);
+  }
+  .year-row .year-label { font-family: var(--serif); font-weight:600; font-size:14px; margin-bottom:8px; }
+  .crash-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .crash-btn {
+    font-size:11.5px; font-weight:600; padding:6px 9px; border-radius:8px;
+    border:1px solid var(--border); background: var(--surface); color: var(--ink-soft);
+  }
+  .crash-btn:hover { border-color: var(--brick); color: var(--brick); }
+  .crash-btn.active { background: var(--brick); border-color:var(--brick); color:#fff; }
+  .crash-tag { font-size:11px; color: var(--brick); margin-top:6px; font-weight:600; }
+
+  .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:18px; }
+
+  .stat-line { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color: var(--ink-soft); margin-top:10px; }
+  .stat-line strong { color: var(--ink); font-family: var(--serif); }
+
+  footer.note { text-align:center; color: var(--ink-soft); font-size:12px; padding: 6px 16px 26px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <h1>Holding Ground</h1>
+    <span>Stock gains visualizer &middot; stored only on this device</span>
+  </div>
+  <div class="top-actions">
+    <button class="btn btn-primary" id="openAdd">Add stock</button>
+    <button class="btn btn-ghost sidebar-toggle" id="openSidebar">Stocks</button>
+  </div>
+</header>
+
+<div class="app">
+  <main class="content">
+    <div class="card">
+      <h2>Portfolio growth over time</h2>
+      <p class="sub">Each line is one stock's simulated value, month by month, based on what you entered.</p>
+      <div id="lineEmpty" class="empty-state">
+        <h3>Nothing to plot yet</h3>
+        <p>Add a stock and its year-by-year assumptions to see it grow.</p>
+        <button class="btn btn-primary" id="openAddFromEmpty">Add your first stock</button>
+      </div>
+      <div class="chart-wrap" id="lineWrap" style="display:none;">
+        <canvas id="lineChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card" id="pieCard" style="display:none;">
+      <h2>Portfolio composition</h2>
+      <p class="sub">Share of total simulated value each stock ends up holding.</p>
+      <div class="chart-wrap small">
+        <canvas id="pieChart"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <aside class="sidebar" id="sidebar">
+    <h2>Your stocks</h2>
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchInput" placeholder="Search stocks...">
+    </div>
+    <div class="stock-list" id="stockList"></div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+</div>
+
+<footer class="note">All figures are hypothetical, entered by you — not live market data.</footer>
+
+<!-- Add/Edit modal -->
+<div class="modal-scrim" id="addModalScrim">
+  <div class="modal">
+    <h3 id="modalTitle">Add a stock</h3>
+    <div class="field">
+      <label for="stockName">Stock name</label>
+      <input type="text" id="stockName" placeholder="e.g. Apple">
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label for="stockPrice">Current price ($)</label>
+        <input type="number" id="stockPrice" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label for="stockYears">Years to hold</label>
+        <input type="number" id="stockYears" min="1" max="30" step="1" placeholder="5">
+      </div>
+    </div>
+    <div class="field">
+      <label for="stockColor">Line colour</label>
+      <div class="color-row">
+        <input type="color" id="stockColor" value="#2F6F4E">
+        <span style="font-size:13px;color:var(--ink-soft);">Shown on the line graph and in your stock list</span>
+      </div>
+    </div>
+
+    <div id="yearRows"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelAdd">Cancel</button>
+      <button class="btn btn-primary" id="saveStock">Save stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div class="modal-scrim" id="deleteModalScrim">
+  <div class="modal confirm">
+    <h3>Remove this stock?</h3>
+    <p style="color:var(--ink-soft);font-size:14px;margin-top:-8px;" id="deleteText">This will permanently remove it and its chart data from this device.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelDelete">Cancel</button>
+      <button class="btn btn-danger" id="confirmDelete">Remove</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const STORAGE_KEY = "holdingground.stocks.v1";
+  const CRASHES = [
+    { id:"dotcom", label:"Dot-com 2000\u201302", pct:-49 },
+    { id:"gfc",    label:"2008 Financial Crisis", pct:-57 },
+    { id:"covid",  label:"COVID Crash 2020", pct:-34 },
+    { id:"y2022",  label:"2022 Bear Market", pct:-25 }
+  ];
+
+  let stocks = [];
+  let editingId = null;
+  let deletingId = null;
+  let lineChart = null;
+  let pieChart = null;
+
+  // ---------- storage ----------
+  function loadStocks(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      stocks = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(stocks)) stocks = [];
+    } catch(e){
+      console.error("Could not read saved stocks", e);
+      stocks = [];
+    }
+  }
+  function saveStocks(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stocks)); }
+    catch(e){ console.error("Could not save stocks", e); }
+  }
+
+  // ---------- simulation ----------
+  function simulateStock(stock){
+    let balance = 0, invested = 0;
+    const values = [];
+    (stock.years || []).forEach(y=>{
+      const monthlyRate = Math.pow(1 + (y.growthPct||0)/100, 1/12) - 1;
+      for (let m=0; m<12; m++){
+        balance = balance * (1+monthlyRate) + (Number(y.monthly)||0);
+        invested += Number(y.monthly)||0;
+        values.push(balance);
+      }
+    });
+    return { values, invested, final: balance };
+  }
+
+  function fmtMoney(n){
+    return "$" + Number(n).toLocaleString(undefined, {maximumFractionDigits:0});
+  }
+
+  // ---------- rendering: charts ----------
+  function renderCharts(){
+    const lineEmpty = document.getElementById("lineEmpty");
+    const lineWrap = document.getElementById("lineWrap");
+    const pieCard = document.getElementById("pieCard");
+
+    if (stocks.length === 0){
+      lineEmpty.style.display = "block";
+      lineWrap.style.display = "none";
+      pieCard.style.display = "none";
+      if (lineChart){ lineChart.destroy(); lineChart = null; }
+      if (pieChart){ pieChart.destroy(); pieChart = null; }
+      return;
+    }
+
+    lineEmpty.style.display = "none";
+    lineWrap.style.display = "block";
+    pieCard.style.display = "block";
+
+    const sims = stocks.map(s => ({ stock:s, sim: simulateStock(s) }));
+    const maxMonths = Math.max(...sims.map(x => x.sim.values.length), 1);
+    const labels = Array.from({length: maxMonths}, (_,i)=> "M" + (i+1));
+
+    const datasets = sims.map(({stock, sim}) => {
+      const data = labels.map((_, i) => i < sim.values.length ? Math.round(sim.values[i]) : null);
+      return {
+        label: stock.name,
+        data,
+        borderColor: stock.color,
+        backgroundColor: stock.color,
+        borderWidth: 2.5,
+        tension: 0.25,
+        pointRadius: 0,
+        spanGaps: false
+      };
+    });
+
+    const lineCtx = document.getElementById("lineChart").getContext("2d");
+    if (lineChart) lineChart.destroy();
+    lineChart = new Chart(lineCtx, {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth:10, boxHeight:10, usePointStyle:true, font:{family:"IBM Plex Sans", size:12} } },
+          tooltip: { callbacks: { label: (ctx)=> ctx.dataset.label + ": " + fmtMoney(ctx.parsed.y) } }
+        },
+        scales: {
+          x: { grid: { display:false }, ticks: { maxTicksLimit: 10 } },
+          y: { ticks: { callback: (v)=> fmtMoney(v) } }
+        }
+      }
+    });
+
+    const pieCtx = document.getElementById("pieChart").getContext("2d");
+    if (pieChart) pieChart.destroy();
+    pieChart = new Chart(pieCtx, {
+      type: "pie",
+      data: {
+        labels: sims.map(x=>x.stock.name),
+        datasets: [{
+          data: sims.map(x=> Math.max(0, Math.round(x.sim.final))),
+          backgroundColor: sims.map(x=>x.stock.color),
+          borderColor: "var(--surface)",
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: {
+          legend: { position:"bottom", labels:{ boxWidth:10, boxHeight:10, usePointStyle:true, font:{family:"IBM Plex Sans", size:12} } },
+          tooltip: { callbacks: { label: (ctx)=> ctx.label + ": " + fmtMoney(ctx.parsed) } }
+        }
+      }
+    });
+  }
+
+  // ---------- rendering: sidebar ----------
+  function iconCog(){
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+  }
+  function iconCross(){
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  }
+
+  function renderSidebar(){
+    const list = document.getElementById("stockList");
+    const query = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+    const filtered = stocks.filter(s => s.name.toLowerCase().includes(query));
+
+    if (stocks.length === 0){
+      list.innerHTML = '<div class="sidebar-empty">No stocks added yet.</div>';
+      return;
+    }
+    if (filtered.length === 0){
+      list.innerHTML = '<div class="sidebar-empty">No stocks match "' + escapeHtml(query) + '".</div>';
+      return;
+    }
+
+    list.innerHTML = filtered.map(s => {
+      const sim = simulateStock(s);
+      return (
+        '<div class="stock-card" data-id="' + s.id + '">' +
+          '<div style="flex:1;min-width:0;">' +
+            '<span class="stock-name" style="color:' + s.color + '">' + escapeHtml(s.name) + '</span>' +
+            '<span class="stock-meta">' + fmtMoney(sim.final) + ' &middot; ' + s.years.length + 'y</span>' +
+          '</div>' +
+          '<button class="icon-btn edit-btn" title="Stock settings" data-id="' + s.id + '">' + iconCog() + '</button>' +
+          '<button class="icon-btn danger delete-btn" title="Remove stock" data-id="' + s.id + '">' + iconCross() + '</button>' +
+        '</div>'
+      );
+    }).join("");
+
+    list.querySelectorAll(".edit-btn").forEach(btn=>{
+      btn.addEventListener("click", ()=> openEditModal(btn.dataset.id));
+    });
+    list.querySelectorAll(".delete-btn").forEach(btn=>{
+      btn.addEventListener("click", ()=> openDeleteModal(btn.dataset.id));
+    });
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderAll(){
+    renderSidebar();
+    renderCharts();
+  }
+
+  // ---------- year rows in modal ----------
+  function buildYearRows(count, existingYears){
+    const wrap = document.getElementById("yearRows");
+    wrap.innerHTML = "";
+    const n = Math.max(1, Math.min(30, Number(count)||1));
+    for (let i=0; i<n; i++){
+      const existing = (existingYears && existingYears[i]) || { monthly:"", growthPct:"", crash:null };
+      const row = document.createElement("div");
+      row.className = "year-row";
+      row.dataset.year = i+1;
+      row.innerHTML =
+        '<div class="year-label">Year ' + (i+1) + '</div>' +
+        '<div class="row-2">' +
+          '<div class="field" style="margin-bottom:0;"><label>Monthly investment ($)</label>' +
+            '<input type="number" class="yr-monthly" min="0" step="1" value="' + (existing.monthly ?? "") + '"></div>' +
+          '<div class="field" style="margin-bottom:0;"><label>Annual growth (%)</label>' +
+            '<input type="number" class="yr-growth" step="0.1" value="' + (existing.growthPct ?? "") + '"></div>' +
+        '</div>' +
+        '<div class="crash-row"></div>' +
+        '<div class="crash-tag" style="display:' + (existing.crash ? "block" : "none") + ';"></div>';
+
+      const crashRow = row.querySelector(".crash-row");
+      const crashTag = row.querySelector(".crash-tag");
+      const growthInput = row.querySelector(".yr-growth");
+
+      CRASHES.forEach(c=>{
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "crash-btn" + (existing.crash === c.id ? " active" : "");
+        b.textContent = c.label + " (" + c.pct + "%)";
+        b.addEventListener("click", ()=>{
+          growthInput.value = c.pct;
+          row.dataset.crash = c.id;
+          crashRow.querySelectorAll(".crash-btn").forEach(x=>x.classList.remove("active"));
+          b.classList.add("active");
+          crashTag.style.display = "block";
+          crashTag.textContent = "Simulating: " + c.label;
+        });
+        crashRow.appendChild(b);
+      });
+
+      if (existing.crash){
+        row.dataset.crash = existing.crash;
+        const match = CRASHES.find(c=>c.id===existing.crash);
+        if (match) crashTag.textContent = "Simulating: " + match.label;
+      }
+
+      growthInput.addEventListener("input", ()=>{
+        delete row.dataset.crash;
+        crashRow.querySelectorAll(".crash-btn").forEach(x=>x.classList.remove("active"));
+        crashTag.style.display = "none";
+      });
+
+      wrap.appendChild(row);
+    }
+  }
+
+  function collectYearData(){
+    const rows = document.querySelectorAll("#yearRows .year-row");
+    return Array.from(rows).map(row => ({
+      year: Number(row.dataset.year),
+      monthly: Number(row.querySelector(".yr-monthly").value) || 0,
+      growthPct: Number(row.querySelector(".yr-growth").value) || 0,
+      crash: row.dataset.crash || null
+    }));
+  }
+
+  // ---------- modals ----------
+  function openAddModal(){
+    editingId = null;
+    document.getElementById("modalTitle").textContent = "Add a stock";
+    document.getElementById("stockName").value = "";
+    document.getElementById("stockPrice").value = "";
+    document.getElementById("stockYears").value = 5;
+    document.getElementById("stockColor").value = randomColor();
+    buildYearRows(5, null);
+    document.getElementById("addModalScrim").classList.add("open");
+  }
+
+  function openEditModal(id){
+    const stock = stocks.find(s=>s.id===id);
+    if (!stock) return;
+    editingId = id;
+    document.getElementById("modalTitle").textContent = "Edit " + stock.name;
+    document.getElementById("stockName").value = stock.name;
+    document.getElementById("stockPrice").value = stock.currentPrice;
+    document.getElementById("stockYears").value = stock.years.length;
+    document.getElementById("stockColor").value = stock.color;
+    buildYearRows(stock.years.length, stock.years);
+    document.getElementById("addModalScrim").classList.add("open");
+  }
+
+  function closeAddModal(){
+    document.getElementById("addModalScrim").classList.remove("open");
+    editingId = null;
+  }
+
+  function openDeleteModal(id){
+    const stock = stocks.find(s=>s.id===id);
+    if (!stock) return;
+    deletingId = id;
+    document.getElementById("deleteText").textContent =
+      'Remove "' + stock.name + '"? This will permanently delete it and its chart data from this device.';
+    document.getElementById("deleteModalScrim").classList.add("open");
+  }
+  function closeDeleteModal(){
+    document.getElementById("deleteModalScrim").classList.remove("open");
+    deletingId = null;
+  }
+
+  function randomColor(){
+    const palette = ["#2F6F4E","#B98A2E","#3B6EA8","#A33B2E","#7A4FA0","#3F8F8A","#C0632F","#5C7A2E"];
+    return palette[Math.floor(Math.random()*palette.length)];
+  }
+
+  // ---------- save / delete ----------
+  function saveStock(){
+    const name = document.getElementById("stockName").value.trim();
+    const price = Number(document.getElementById("stockPrice").value) || 0;
+    const years = collectYearData();
+    const color = document.getElementById("stockColor").value;
+
+    if (!name){
+      alert("Give this stock a name before saving.");
+      return;
+    }
+    if (years.length === 0){
+      alert("Set at least one year to hold.");
+      return;
+    }
+
+    if (editingId){
+      const stock = stocks.find(s=>s.id===editingId);
+      stock.name = name; stock.currentPrice = price; stock.years = years; stock.color = color;
+    } else {
+      stocks.push({
+        id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+        name, currentPrice: price, color, years
+      });
+    }
+    saveStocks();
+    closeAddModal();
+    renderAll();
+  }
+
+  function confirmDelete(){
+    stocks = stocks.filter(s=>s.id!==deletingId);
+    saveStocks();
+    closeDeleteModal();
+    renderAll();
+  }
+
+  // ---------- sidebar drawer (mobile) ----------
+  function openSidebar(){
+    document.getElementById("sidebar").classList.add("open");
+    document.getElementById("scrim").classList.add("open");
+  }
+  function closeSidebar(){
+    document.getElementById("sidebar").classList.remove("open");
+    document.getElementById("scrim").classList.remove("open");
+  }
+
+  // ---------- wire up ----------
+  document.getElementById("openAdd").addEventListener("click", openAddModal);
+  document.getElementById("openAddFromEmpty").addEventListener("click", openAddModal);
+  document.getElementById("cancelAdd").addEventListener("click", closeAddModal);
+  document.getElementById("saveStock").addEventListener("click", saveStock);
+  document.getElementById("stockYears").addEventListener("input", (e)=>{
+    const existing = editingId ? (stocks.find(s=>s.id===editingId)||{}).years : null;
+    buildYearRows(e.target.value, existing);
+  });
+  document.getElementById("cancelDelete").addEventListener("click", closeDeleteModal);
+  document.getElementById("confirmDelete").addEventListener("click", confirmDelete);
+  document.getElementById("searchInput").addEventListener("input", renderSidebar);
+  document.getElementById("openSidebar").addEventListener("click", openSidebar);
+  document.getElementById("scrim").addEventListener("click", closeSidebar);
+  document.getElementById("addModalScrim").addEventListener("click", (e)=>{ if (e.target.id==="addModalScrim") closeAddModal(); });
+  document.getElementById("deleteModalScrim").addEventListener("click", (e)=>{ if (e.target.id==="deleteModalScrim") closeDeleteModal(); });
+
+  // ---------- init ----------
+  loadStocks();
+  renderAll();
+})();
+</script>
+</body>
 </html>
